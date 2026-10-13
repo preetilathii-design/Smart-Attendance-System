@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Smart Attendance Management System</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <div class="app">
+
+        <!-- ================= SIDEBAR ================= -->
+
+        <aside class="sidebar">
+
+            <div class="logo">
+                <h2>Smart Attendance</h2>
+                <p>Management System</p>
+            </div>
+
+            <nav class="sidebar-nav">
+
+                <button class="nav-link active" data-section="dashboard">
+                    Dashboard
+                </button>
+
+                <button class="nav-link" data-section="students">
+                    Students
+                </button>
+
+                <button class="nav-link" data-section="attendance">
+                    Attendance
+                </button>
+
+                <button class="nav-link" data-section="subjects">
+                    Subjects
+                </button>
+
+                <button class="nav-link" data-section="reports">
+                    Reports
+                </button>
+
+            </nav>
+
+        </aside>
+
+
+        <!-- ================= MAIN CONTENT ================= -->
+
+        <main class="main-content">
+
+
+            <!-- ================= DASHBOARD ================= -->
+
+            <section id="dashboard" class="page-section active-section">
+
+                <div class="top-header">
+
+                    <h1>Dashboard</h1>
+
+                    <p>
+                        Welcome to Smart Attendance Management System
+                    </p>
+
+                </div>
+
+
+                <!-- Statistics -->
+
+                <div class="stats-grid">
+
+                    <div class="stat-card">
+
+                        <p>Total Students</p>
+
+                        <h2 id="totalStudents">0</h2>
+
+                    </div>
+
+
+                    <div class="stat-card">
+
+                        <p>Present Today</p>
+
+                        <h2 id="presentToday">0</h2>
+
+                    </div>
+
+
+                    <div class="stat-card">
+
+                        <p>Absent Today</p>
+
+                        <h2 id="absentToday">0</h2>
+
+                    </div>
+
+
+                    <div class="stat-card">
+
+                        <p>Attendance Rate</p>
+
+                        <h2 id="attendanceRate">0%</h2>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Recent Attendance -->
+
+                <div class="content-card">
+
+                    <div class="section-header">
+
+                        <div>
+
+                            <h2>Recent Attendance</h2>
+
+                            <p>
+                                Latest attendance records
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="table-container">
+
+                        <table>
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>Student</th>
+
+                                    <th>Subject</th>
+
+                                    <th>Date</th>
+
+                                    <th>Status</th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody id="recentAttendance">
+
+                                <tr>
+
+                                    <td colspan="4" class="empty-state">
+
+                                        No attendance records available
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- ================= STUDENTS ================= -->
+
+            <!-- ================= STUDENTS ================= -->
+
+<section id="students" class="page-section">
+
+    <div class="top-header">
+
+        <div>
+            <h1>Students</h1>
+
+            <p>
+                Manage student information and records
+            </p>
+        </div>
+
+    </div>
+
+
+    <!-- Student Form -->
+
+    <div class="student-form-card">
+
+        <div class="section-header">
+
+            <h2 id="studentFormTitle">
+                Add New Student
+            </h2>
+
+            <p>
+                Enter student details below
+            </p>
+
+        </div>
+
+
+        <form id="studentForm">
+
+            <input
+                type="hidden"
+                id="editStudentId"
+            >
+
+
+            <div class="form-grid">
+
+                <div class="form-group">
+
+                    <label for="studentName">
+                        Student Name
+                    </label>
+
+                    <input
+                        type="text"
+                        id="studentName"
+                        placeholder="Enter student name"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="rollNumber">
+                        Roll Number
+                    </label>
+
+                    <input
+                        type="text"
+                        id="rollNumber"
+                        placeholder="Enter roll number"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="course">
+                        Course
+                    </label>
+
+                    <select id="course" required>
+
+                        <option value="">
+                            Select course
+                        </option>
+
+                        <option value="CSE">
+                            CSE
+                        </option>
+
+                        <option value="CSE-AIML">
+                            CSE-AIML
+                        </option>
+
+                        <option value="CSE-DS">
+                            CSE-DS
+                        </option>
+
+                        <option value="IT">
+                            IT
+                        </option>
+
+                        <option value="ECE">
+                            ECE
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="semester">
+                        Semester
+                    </label>
+
+                    <select id="semester" required>
+
+                        <option value="">
+                            Select semester
+                        </option>
+
+                        <option value="1st">
+                            1st Semester
+                        </option>
+
+                        <option value="2nd">
+                            2nd Semester
+                        </option>
+
+                        <option value="3rd">
+                            3rd Semester
+                        </option>
+
+                        <option value="4th">
+                            4th Semester
+                        </option>
+
+                        <option value="5th">
+                            5th Semester
+                        </option>
+
+                        <option value="6th">
+                            6th Semester
+                        </option>
+
+                        <option value="7th">
+                            7th Semester
+                        </option>
+
+                        <option value="8th">
+                            8th Semester
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-actions">
+
+                <button
+                    type="submit"
+                    class="primary-btn"
+                    id="studentSubmitBtn"
+                >
+                    Add Student
+                </button>
+
+                <button
+                    type="button"
+                    class="secondary-btn"
+                    id="cancelEditBtn"
+                    style="display: none;"
+                >
+                    Cancel
+                </button>
+
+            </div>
+
+
+            <p
+                id="studentFormMessage"
+                class="form-message"
+            ></p>
+
+        </form>
+
+    </div>
+
+
+    <!-- Student List -->
+
+    <div class="content-card student-list-card">
+
+        <div class="student-list-header">
+
+            <div class="section-header">
+
+                <h2>Student Records</h2>
+
+                <p>
+                    View and manage registered students
+                </p>
+
+            </div>
+
+
+            <div class="search-box">
+
+                <input
+                    type="text"
+                    id="studentSearch"
+                    placeholder="Search students..."
+                >
+
+            </div>
+
+        </div>
+
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Roll No.</th>
+
+                        <th>Student Name</th>
+
+                        <th>Course</th>
+
+                        <th>Semester</th>
+
+                        <th>Actions</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="studentTableBody">
+
+                    <tr>
+
+                        <td
+                            colspan="5"
+                            class="empty-state"
+                        >
+                            No students added yet
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+            <!-- ================= ATTENDANCE ================= -->
+
+            <!-- ================= ATTENDANCE ================= -->
+
+<section id="attendance" class="page-section">
+
+    <div class="top-header">
+
+        <div>
+            <h1>Attendance</h1>
+
+            <p>
+                Mark and manage student attendance
+            </p>
+        </div>
+
+    </div>
+
+
+    <!-- Attendance Controls -->
+
+    <div class="attendance-control-card">
+
+        <div class="section-header">
+
+            <h2>Mark Attendance</h2>
+
+            <p>
+                Select the date and subject before marking attendance
+            </p>
+
+        </div>
+
+
+        <div class="attendance-controls">
+
+            <div class="form-group">
+
+                <label for="attendanceDate">
+                    Date
+                </label>
+
+                <input
+                    type="date"
+                    id="attendanceDate"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="attendanceSubject">
+                    Subject
+                </label>
+
+                <select id="attendanceSubject">
+
+    <option value="">
+        Select subject
+    </option>
+
+</select>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Attendance List -->
+
+    <div class="content-card attendance-list-card">
+
+        <div class="attendance-list-header">
+
+            <div class="section-header">
+
+                <h2>Student Attendance</h2>
+
+                <p>
+                    Mark each student's attendance
+                </p>
+
+            </div>
+
+            <div class="attendance-summary">
+
+                <span>
+                    Present:
+                    <strong id="presentCount">0</strong>
+                </span>
+
+                <span>
+                    Absent:
+                    <strong id="absentCount">0</strong>
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Roll No.</th>
+
+                        <th>Student Name</th>
+
+                        <th>Course</th>
+
+                        <th>Attendance</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="attendanceTableBody">
+
+                    <tr>
+
+                        <td
+                            colspan="4"
+                            class="empty-state"
+                        >
+                            Add students first to mark attendance.
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <div class="attendance-save-area">
+
+            <p
+                id="attendanceMessage"
+                class="form-message"
+            ></p>
+
+            <button
+                type="button"
+                class="primary-btn"
+                id="saveAttendanceBtn"
+            >
+                Save Attendance
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+            <!-- ================= SUBJECTS ================= -->
+
+            <!-- ================= SUBJECTS ================= -->
+
+<section id="subjects" class="page-section">
+
+    <div class="top-header">
+
+        <div>
+            <h1>Subjects</h1>
+
+            <p>
+                Manage subjects for attendance tracking
+            </p>
+        </div>
+
+    </div>
+
+
+    <!-- Add Subject -->
+
+    <div class="student-form-card">
+
+        <div class="section-header">
+
+            <h2>Add New Subject</h2>
+
+            <p>
+                Enter the subject details below
+            </p>
+
+        </div>
+
+
+        <form id="subjectForm">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+
+                    <label for="subjectName">
+                        Subject Name
+                    </label>
+
+                    <input
+                        type="text"
+                        id="subjectName"
+                        placeholder="e.g. Data Structures"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="subjectCode">
+                        Subject Code
+                    </label>
+
+                    <input
+                        type="text"
+                        id="subjectCode"
+                        placeholder="e.g. CS301"
+                        required
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div class="form-actions">
+
+                <button
+                    type="submit"
+                    class="primary-btn"
+                >
+                    Add Subject
+                </button>
+
+            </div>
+
+
+            <p
+                id="subjectMessage"
+                class="form-message"
+            ></p>
+
+        </form>
+
+    </div>
+
+
+    <!-- Subject List -->
+
+    <div class="content-card student-list-card">
+
+        <div class="student-list-header">
+
+            <div class="section-header">
+
+                <h2>Subject Records</h2>
+
+                <p>
+                    View and manage available subjects
+                </p>
+
+            </div>
+
+
+            <div class="search-box">
+
+                <input
+                    type="text"
+                    id="subjectSearch"
+                    placeholder="Search subjects..."
+                >
+
+            </div>
+
+        </div>
+
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Subject Code</th>
+
+                        <th>Subject Name</th>
+
+                        <th>Actions</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="subjectTableBody">
+
+                    <tr>
+
+                        <td
+                            colspan="3"
+                            class="empty-state"
+                        >
+                            No subjects added yet
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+            <!-- ================= REPORTS ================= -->
+
+            <!-- ================= REPORTS ================= -->
+
+<section id="reports" class="page-section">
+
+    <div class="top-header">
+
+        <div>
+            <h1>Attendance Reports</h1>
+
+            <p>
+                View student attendance performance
+            </p>
+        </div>
+
+    </div>
+
+
+    <!-- Report Filters -->
+
+    <div class="report-filter-card">
+
+        <div class="section-header">
+
+            <h2>Generate Report</h2>
+
+            <p>
+                Filter attendance records to view performance
+            </p>
+
+        </div>
+
+
+        <div class="report-filters">
+
+            <div class="form-group">
+
+                <label for="reportStudent">
+                    Student
+                </label>
+
+                <select id="reportStudent">
+
+                    <option value="all">
+                        All Students
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="reportSubject">
+                    Subject
+                </label>
+
+                <select id="reportSubject">
+
+                    <option value="all">
+                        All Subjects
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="primary-btn"
+                id="generateReportBtn"
+            >
+                Generate Report
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- Report Summary -->
+
+    <div class="report-summary-grid">
+
+        <div class="report-stat">
+
+            <span>Total Classes</span>
+
+            <strong id="reportTotalClasses">
+                0
+            </strong>
+
+        </div>
+
+
+        <div class="report-stat">
+
+            <span>Present</span>
+
+            <strong id="reportPresent">
+                0
+            </strong>
+
+        </div>
+
+
+        <div class="report-stat">
+
+            <span>Absent</span>
+
+            <strong id="reportAbsent">
+                0
+            </strong>
+
+        </div>
+
+
+        <div class="report-stat">
+
+            <span>Attendance Rate</span>
+
+            <strong id="reportPercentage">
+                0%
+            </strong>
+
+        </div>
+
+    </div>
+
+
+    <!-- Report Table -->
+
+    <div class="content-card">
+
+        <div class="section-header">
+
+            <h2>Attendance Records</h2>
+
+            <p>
+                Detailed attendance information
+            </p>
+
+        </div>
+
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Roll No.</th>
+
+                        <th>Student</th>
+
+                        <th>Subject</th>
+
+                        <th>Date</th>
+
+                        <th>Status</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="reportTableBody">
+
+                    <tr>
+
+                        <td
+                            colspan="5"
+                            class="empty-state"
+                        >
+                            No attendance records available
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>
