@@ -1,2101 +1,1085 @@
-/* =====================================================
+
+/* =========================================================
    SMART ATTENDANCE MANAGEMENT SYSTEM
-===================================================== */
-
-
-/* =====================================================
-   NAVIGATION
-===================================================== */
-
-const navLinks = document.querySelectorAll(".nav-link");
-
-const pageSections =
-    document.querySelectorAll(".page-section");
-
-
-navLinks.forEach(function (link) {
-
-    link.addEventListener("click", function () {
-
-        const sectionName =
-            this.dataset.section;
-
-
-        navLinks.forEach(function (navLink) {
-
-            navLink.classList.remove("active");
-
-        });
-
-
-        this.classList.add("active");
-
-
-        pageSections.forEach(function (section) {
-
-            section.classList.remove(
-                "active-section"
-            );
-
-        });
-
-
-        const selectedSection =
-            document.getElementById(sectionName);
-
-
-        if (selectedSection) {
-
-            selectedSection.classList.add(
-                "active-section"
-            );
-
-        }
-
-
-        /* Refresh attendance list when opening page */
-
-        if (sectionName === "attendance") {
-
-            displayAttendanceStudents();
-
-        }
-
-
-        /* Refresh dashboard when opening page */
-
-        if (sectionName === "dashboard") {
-
-            updateDashboard();
-
-        }
-
-    });
-
-});
-
-
-/* =====================================================
-   STUDENT DATA
-===================================================== */
-
-let students =
-    JSON.parse(
-        localStorage.getItem(
-            "smartAttendanceStudents"
-        )
-    ) || [];
-
-
-/* =====================================================
-   ATTENDANCE DATA
-===================================================== */
-
-let attendanceRecords =
-    JSON.parse(
-        localStorage.getItem(
-            "smartAttendanceRecords"
-        )
-    ) || [];
-
-
-/* =====================================================
-   STUDENT ELEMENTS
-===================================================== */
-
-const studentForm =
-    document.getElementById("studentForm");
-
-const studentName =
-    document.getElementById("studentName");
-
-const rollNumber =
-    document.getElementById("rollNumber");
-
-const course =
-    document.getElementById("course");
-
-const semester =
-    document.getElementById("semester");
-
-const editStudentId =
-    document.getElementById("editStudentId");
-
-const studentTableBody =
-    document.getElementById("studentTableBody");
-
-const studentSearch =
-    document.getElementById("studentSearch");
-
-const studentSubmitBtn =
-    document.getElementById("studentSubmitBtn");
-
-const cancelEditBtn =
-    document.getElementById("cancelEditBtn");
-
-const studentFormTitle =
-    document.getElementById("studentFormTitle");
-
-const studentFormMessage =
-    document.getElementById("studentFormMessage");
-
-
-/* =====================================================
-   ATTENDANCE ELEMENTS
-===================================================== */
-
-const attendanceDate =
-    document.getElementById("attendanceDate");
-
-const attendanceSubject =
-    document.getElementById(
-        "attendanceSubject"
-    );
-
-const attendanceTableBody =
-    document.getElementById(
-        "attendanceTableBody"
-    );
-
-const presentCount =
-    document.getElementById(
-        "presentCount"
-    );
-
-const absentCount =
-    document.getElementById(
-        "absentCount"
-    );
-
-const saveAttendanceBtn =
-    document.getElementById(
-        "saveAttendanceBtn"
-    );
-
-const attendanceMessage =
-    document.getElementById(
-        "attendanceMessage"
-    );
-
-
-/* =====================================================
-   SET TODAY'S DATE
-===================================================== */
-
-function setTodayDate() {
-
-    if (!attendanceDate) {
-
+   Supabase Authentication + Database
+   ========================================================= */
+
+(() => {
+    "use strict";
+
+    const supabaseClient = window.supabaseClient;
+
+    if (!supabaseClient) {
+        document.body.innerHTML = `
+            <div style="font-family:Arial,sans-serif;padding:30px">
+                <h2>Supabase connection not found</h2>
+                <p>Check js/supabase.js and make sure the Supabase library
+                loads before app.js. Open this project using VS Code Live Server.</p>
+            </div>`;
         return;
-
     }
 
+    let students = [];
+    let subjects = [];
+    let attendanceRecords = [];
+    let currentAttendance = {};
+    let currentUser = null;
+    let isLoading = false;
 
-    const today =
-        new Date();
+    const $ = (id) => document.getElementById(id);
 
+    const today = () => {
+        const d = new Date();
+        return [
+            d.getFullYear(),
+            String(d.getMonth() + 1).padStart(2, "0"),
+            String(d.getDate()).padStart(2, "0")
+        ].join("-");
+    };
 
-    const year =
-        today.getFullYear();
-
-
-    const month =
-        String(
-            today.getMonth() + 1
-        ).padStart(2, "0");
-
-
-    const day =
-        String(
-            today.getDate()
-        ).padStart(2, "0");
-
-
-    attendanceDate.value =
-        `${year}-${month}-${day}`;
-
-}
-
-
-/* =====================================================
-   SAVE STUDENTS
-===================================================== */
-
-function saveStudents() {
-
-    localStorage.setItem(
-        "smartAttendanceStudents",
-        JSON.stringify(students)
+    const escapeHTML = (value) => String(value ?? "").replace(
+        /[&<>"']/g,
+        char => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        })[char]
     );
 
-}
+    const showMessage = (element, message, type = "error") => {
+        if (!element) return;
 
+        element.textContent = message;
+        element.style.color =
+            type === "success" ? "#16803d" :
+            type === "info" ? "#475569" : "#dc2626";
+    };
 
-/* =====================================================
-   SAVE ATTENDANCE
-===================================================== */
+    const showError = (error, prefix = "Something went wrong") => {
+        console.error(prefix, error);
+        return `${prefix}: ${error?.message || "Please try again."}`;
+    };
 
-function saveAttendanceRecords() {
+    const formatDate = (date) => {
+        if (!date) return "—";
 
-    localStorage.setItem(
-        "smartAttendanceRecords",
-        JSON.stringify(
-            attendanceRecords
-        )
-    );
+        const parts = String(date).split("-");
+        if (parts.length !== 3) return escapeHTML(date);
 
-}
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    };
 
+    /* =====================================================
+       LOGIN SCREEN AND LOGOUT BUTTON
+       ===================================================== */
 
-/* =====================================================
-   DISPLAY STUDENTS
-===================================================== */
+    function createAuthUI() {
+        const style = document.createElement("style");
 
-function displayStudents(
-    searchTerm = ""
-) {
+        style.textContent = `
+            #sam-auth-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 99999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                background: #f3f5fa;
+                font-family: Arial, sans-serif;
+            }
 
-    if (!studentTableBody) {
+            #sam-auth-overlay * { box-sizing: border-box; }
 
-        return;
+            .sam-auth-card {
+                width: 100%;
+                max-width: 420px;
+                padding: 32px;
+                border-radius: 16px;
+                background: #fff;
+                box-shadow: 0 12px 40px rgba(0,0,0,.10);
+            }
 
-    }
+            .sam-auth-card h1 {
+                margin: 0 0 8px;
+                color: #172554;
+                font-size: 25px;
+            }
 
+            .sam-auth-card p {
+                margin: 0 0 24px;
+                color: #64748b;
+                line-height: 1.5;
+            }
 
-    studentTableBody.innerHTML = "";
+            .sam-auth-card label {
+                display: block;
+                margin: 16px 0 7px;
+                color: #334155;
+                font-size: 14px;
+                font-weight: 600;
+            }
 
+            .sam-auth-card input {
+                width: 100%;
+                padding: 12px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                font-size: 15px;
+            }
 
-    const search =
-        searchTerm.toLowerCase();
+            .sam-auth-card input:focus {
+                outline: 2px solid #93c5fd;
+                border-color: #2563eb;
+            }
 
+            .sam-auth-card button {
+                width: 100%;
+                margin-top: 22px;
+                padding: 13px;
+                border: none;
+                border-radius: 8px;
+                background: #2563eb;
+                color: white;
+                font-size: 15px;
+                font-weight: 600;
+                cursor: pointer;
+            }
 
-    const filteredStudents =
-        students.filter(function (student) {
+            .sam-auth-card button:disabled {
+                opacity: .65;
+                cursor: wait;
+            }
 
-            return (
+            #sam-auth-message {
+                margin-top: 14px;
+                font-size: 14px;
+                overflow-wrap: anywhere;
+            }
 
-                student.name
-                    .toLowerCase()
-                    .includes(search)
+            #sam-logout-btn {
+                display: block;
+                width: calc(100% - 24px);
+                margin: 18px 12px;
+                padding: 11px 14px;
+                border: 1px solid rgba(255,255,255,.25);
+                border-radius: 8px;
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                text-align: left;
+                cursor: pointer;
+            }
 
-                ||
+            #sam-logout-btn:hover { opacity: .8; }
 
-                student.roll
-                    .toLowerCase()
-                    .includes(search)
-
-                ||
-
-                student.course
-                    .toLowerCase()
-                    .includes(search)
-
-            );
-
-        });
-
-
-    if (filteredStudents.length === 0) {
-
-        studentTableBody.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="5"
-                    class="empty-state"
-                >
-                    ${
-                        students.length === 0
-                        ? "No students added yet"
-                        : "No matching students found"
-                    }
-                </td>
-
-            </tr>
-
+            #sam-app-loading {
+                position: fixed;
+                inset: 0;
+                z-index: 99998;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #f3f5fa;
+                color: #334155;
+                font: 16px Arial, sans-serif;
+            }
         `;
 
-        return;
+        document.head.appendChild(style);
 
+        const overlay = document.createElement("div");
+        overlay.id = "sam-auth-overlay";
+        overlay.style.display = "none";
+
+        overlay.innerHTML = `
+            <form class="sam-auth-card" id="sam-login-form">
+                <h1>Smart Attendance</h1>
+                <p>Sign in with your administrator account to manage attendance.</p>
+
+                <label for="sam-login-email">Admin Email</label>
+                <input
+                    id="sam-login-email"
+                    type="email"
+                    autocomplete="username"
+                    placeholder="Enter admin email"
+                    required
+                >
+
+                <label for="sam-login-password">Password</label>
+                <input
+                    id="sam-login-password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Enter password"
+                    required
+                >
+
+                <button id="sam-login-button" type="submit">Sign In</button>
+                <div id="sam-auth-message" role="status" aria-live="polite"></div>
+            </form>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const loading = document.createElement("div");
+        loading.id = "sam-app-loading";
+        loading.textContent = "Connecting to your attendance database...";
+        document.body.appendChild(loading);
+
+        const logoutButton = document.createElement("button");
+        logoutButton.id = "sam-logout-btn";
+        logoutButton.type = "button";
+        logoutButton.textContent = "Log out";
+
+        const nav = document.querySelector(".sidebar-nav");
+        if (nav) nav.appendChild(logoutButton);
+
+        $("sam-login-form").addEventListener("submit", signIn);
+        logoutButton.addEventListener("click", signOut);
+
+        return { overlay, loading, logoutButton };
     }
 
+    const authUI = createAuthUI();
 
-    filteredStudents.forEach(
-        function (student) {
+    async function signIn(event) {
+        event.preventDefault();
 
-            const row =
-                document.createElement("tr");
+        const email = $("sam-login-email").value.trim();
+        const password = $("sam-login-password").value;
+        const button = $("sam-login-button");
+        const message = $("sam-auth-message");
 
+        button.disabled = true;
+        button.textContent = "Signing in...";
+        showMessage(message, "Checking your credentials...", "info");
 
-            row.innerHTML = `
+        try {
+            const { data, error } =
+                await supabaseClient.auth.signInWithPassword({
+                    email,
+                    password
+                });
 
-                <td>
+            if (error) throw error;
 
-                    <span class="roll-number">
-                        ${student.roll}
-                    </span>
+            currentUser = data.user;
+            await loadAllData();
 
-                </td>
-
-
-                <td>
-
-                    <span class="student-table-name">
-                        ${student.name}
-                    </span>
-
-                </td>
-
-
-                <td>
-
-                    <span class="course-badge">
-                        ${student.course}
-                    </span>
-
-                </td>
-
-
-                <td>
-                    ${student.semester} Semester
-                </td>
-
-
-                <td>
-
-                    <div class="action-buttons">
-
-                        <button
-                            class="edit-btn"
-                            onclick="editStudent('${student.id}')"
-                        >
-                            Edit
-                        </button>
-
-                        <button
-                            class="delete-btn"
-                            onclick="deleteStudent('${student.id}')"
-                        >
-                            Delete
-                        </button>
-
-                    </div>
-
-                </td>
-
-            `;
-
-
-            studentTableBody.appendChild(row);
-
+            authUI.overlay.style.display = "none";
+            authUI.loading.style.display = "none";
+            document.querySelector(".app").style.visibility = "visible";
+        } catch (error) {
+            showMessage(
+                message,
+                showError(error, "Sign-in failed"),
+                "error"
+            );
+        } finally {
+            button.disabled = false;
+            button.textContent = "Sign In";
         }
-    );
+    }
 
-}
+    async function signOut() {
+        if (!confirm("Are you sure you want to log out?")) return;
 
+        try {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) throw error;
 
-/* =====================================================
-   ADD / UPDATE STUDENT
-===================================================== */
+            currentUser = null;
+            students = [];
+            subjects = [];
+            attendanceRecords = [];
+            currentAttendance = {};
 
-if (studentForm) {
+            authUI.overlay.style.display = "flex";
+            authUI.loading.style.display = "none";
+            $("sam-login-password").value = "";
+            showMessage($("sam-auth-message"), "", "info");
+        } catch (error) {
+            alert(showError(error, "Could not log out"));
+        }
+    }
 
-    studentForm.addEventListener(
-        "submit",
-        function (event) {
+    /* =====================================================
+       LOAD DATA FROM SUPABASE
+       ===================================================== */
 
-            event.preventDefault();
+    async function loadAllData() {
+        if (!currentUser) return;
 
+        isLoading = true;
 
-            const name =
-                studentName.value.trim();
+        try {
+            const [studentResult, subjectResult, attendanceResult] =
+                await Promise.all([
+                    supabaseClient
+                        .from("students")
+                        .select("id,name,roll_number,course,semester")
+                        .order("id"),
 
-            const roll =
-                rollNumber.value.trim();
+                    supabaseClient
+                        .from("subjects")
+                        .select("id,name,subject_code")
+                        .order("id"),
 
-            const selectedCourse =
-                course.value;
+                    supabaseClient
+                        .from("attendance")
+                        .select("id,student_id,subject_id,attendance_date,status")
+                        .order("attendance_date", { ascending: false })
+                ]);
 
-            const selectedSemester =
-                semester.value;
+            if (studentResult.error) throw studentResult.error;
+            if (subjectResult.error) throw subjectResult.error;
+            if (attendanceResult.error) throw attendanceResult.error;
 
+            students = (studentResult.data || []).map(s => ({
+                id: String(s.id),
+                name: s.name,
+                roll: s.roll_number,
+                course: s.course || "",
+                semester: s.semester || ""
+            }));
 
-            if (
-                !name ||
-                !roll ||
-                !selectedCourse ||
-                !selectedSemester
-            ) {
+            subjects = (subjectResult.data || []).map(s => ({
+                id: String(s.id),
+                name: s.name,
+                code: s.subject_code || ""
+            }));
 
-                showFormMessage(
-                    "Please fill in all fields.",
-                    "error"
+            attendanceRecords = (attendanceResult.data || []).map(a => {
+                const student = students.find(
+                    s => s.id === String(a.student_id)
                 );
 
-                return;
-
-            }
-
-
-            const duplicate =
-                students.find(
-                    function (student) {
-
-                        return (
-
-                            student.roll
-                                .toLowerCase() ===
-                            roll.toLowerCase()
-
-                            &&
-
-                            student.id !==
-                            editStudentId.value
-
-                        );
-
-                    }
+                const subject = subjects.find(
+                    s => s.id === String(a.subject_id)
                 );
 
-
-            if (duplicate) {
-
-                showFormMessage(
-                    "This roll number already exists.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            if (editStudentId.value) {
-
-                const student =
-                    students.find(
-                        function (item) {
-
-                            return (
-                                item.id ===
-                                editStudentId.value
-                            );
-
-                        }
-                    );
-
-
-                if (student) {
-
-                    student.name =
-                        name;
-
-                    student.roll =
-                        roll;
-
-                    student.course =
-                        selectedCourse;
-
-                    student.semester =
-                        selectedSemester;
-
-                }
-
-
-                showFormMessage(
-                    "Student updated successfully.",
-                    "success"
-                );
-
-            }
-
-            else {
-
-                const newStudent = {
-
-                    id:
-                        Date.now().toString(),
-
-                    name:
-                        name,
-
-                    roll:
-                        roll,
-
-                    course:
-                        selectedCourse,
-
-                    semester:
-                        selectedSemester
-
+                return {
+                    id: String(a.id),
+                    date: a.attendance_date,
+                    subject: subject?.name || "Deleted subject",
+                    subjectId: String(a.subject_id),
+                    studentId: String(a.student_id),
+                    studentName: student?.name || "Deleted student",
+                    roll: student?.roll || "—",
+                    status: a.status
                 };
+            });
 
-
-                students.push(
-                    newStudent
-                );
-
-
-                showFormMessage(
-                    "Student added successfully.",
-                    "success"
-                );
-
-            }
-
-
-            saveStudents();
-
-            displayStudents();
-
-            updateDashboard();
-
-            displayAttendanceStudents();
-            updateReportFilters();
-            resetStudentForm();
-
+            fillSubjectDropdowns();
+            fillReportStudentDropdown();
+            renderStudents();
+            renderSubjects();
+            renderAttendance();
+            renderDashboard();
+            generateReport();
+        } catch (error) {
+            alert(showError(
+                error,
+                "Could not load database records. Check your Supabase tables and RLS policies"
+            ));
+            throw error;
+        } finally {
+            isLoading = false;
         }
-    );
-
-}
-
-
-/* =====================================================
-   EDIT STUDENT
-===================================================== */
-
-function editStudent(id) {
-
-    const student =
-        students.find(
-            function (item) {
-
-                return item.id === id;
-
-            }
-        );
-
-
-    if (!student) {
-
-        return;
-
     }
 
+    /* =====================================================
+       NAVIGATION
+       ===================================================== */
 
-    studentName.value =
-        student.name;
+    document.querySelectorAll(".nav-link[data-section]").forEach(link => {
+        link.addEventListener("click", () => {
+            const sectionName = link.dataset.section;
 
-    rollNumber.value =
-        student.roll;
+            document.querySelectorAll(".nav-link").forEach(item => {
+                item.classList.remove("active");
+            });
 
-    course.value =
-        student.course;
+            document.querySelectorAll(".page-section").forEach(section => {
+                section.classList.remove("active-section");
+            });
 
-    semester.value =
-        student.semester;
+            link.classList.add("active");
 
-    editStudentId.value =
-        student.id;
+            const section = $(sectionName);
+            if (section) section.classList.add("active-section");
 
-
-    studentFormTitle.textContent =
-        "Edit Student";
-
-    studentSubmitBtn.textContent =
-        "Update Student";
-
-    cancelEditBtn.style.display =
-        "inline-block";
-
-
-    studentFormMessage.textContent =
-        "";
-
-
-    studentForm.scrollIntoView({
-
-        behavior: "smooth",
-
-        block: "start"
-
+            if (sectionName === "dashboard") renderDashboard();
+            if (sectionName === "attendance") renderAttendance();
+            if (sectionName === "reports") generateReport();
+        });
     });
 
-}
+    /* =====================================================
+       STUDENTS
+       ===================================================== */
 
+    function renderStudents() {
+        const body = $("studentTableBody");
+        if (!body) return;
 
-/* =====================================================
-   DELETE STUDENT
-===================================================== */
+        const search = ($("studentSearch")?.value || "").toLowerCase();
 
-function deleteStudent(id) {
-
-    const student =
-        students.find(
-            function (item) {
-
-                return item.id === id;
-
-            }
+        const filtered = students.filter(s =>
+            [s.name, s.roll, s.course, s.semester]
+                .some(value => String(value).toLowerCase().includes(search))
         );
 
-
-    if (!student) {
-
-        return;
-
-    }
-
-
-    const confirmed =
-        confirm(
-            `Delete ${student.name} from student records?`
-        );
-
-
-    if (!confirmed) {
-
-        return;
-
-    }
-
-
-    students =
-        students.filter(
-            function (item) {
-
-                return item.id !== id;
-
-            }
-        );
-
-
-    saveStudents();
-
-    displayStudents();
-
-    updateDashboard();
-
-    displayAttendanceStudents();
-
-
-    showFormMessage(
-        "Student deleted successfully.",
-        "success"
-    );
-
-}
-
-
-/* =====================================================
-   CANCEL EDIT
-===================================================== */
-
-if (cancelEditBtn) {
-
-    cancelEditBtn.addEventListener(
-        "click",
-        function () {
-
-            resetStudentForm();
-
-            studentFormMessage.textContent =
-                "";
-
+        if (!filtered.length) {
+            body.innerHTML = `
+                <tr><td colspan="5" class="empty-state">
+                    ${students.length ? "No matching students found." : "No students added yet."}
+                </td></tr>`;
+            return;
         }
-    );
 
-}
-
-
-/* =====================================================
-   RESET STUDENT FORM
-===================================================== */
-
-function resetStudentForm() {
-
-    if (!studentForm) {
-
-        return;
-
-    }
-
-
-    studentForm.reset();
-
-    editStudentId.value = "";
-
-
-    studentFormTitle.textContent =
-        "Add New Student";
-
-    studentSubmitBtn.textContent =
-        "Add Student";
-
-    cancelEditBtn.style.display =
-        "none";
-
-}
-
-
-/* =====================================================
-   FORM MESSAGE
-===================================================== */
-
-function showFormMessage(
-    message,
-    type
-) {
-
-    if (!studentFormMessage) {
-
-        return;
-
-    }
-
-
-    studentFormMessage.textContent =
-        message;
-
-    studentFormMessage.className =
-        "form-message " + type;
-
-
-    setTimeout(function () {
-
-        studentFormMessage.textContent =
-            "";
-
-        studentFormMessage.className =
-            "form-message";
-
-    }, 3000);
-
-}
-
-
-/* =====================================================
-   SEARCH STUDENTS
-===================================================== */
-
-if (studentSearch) {
-
-    studentSearch.addEventListener(
-        "input",
-        function () {
-
-            displayStudents(
-                this.value
-            );
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   ATTENDANCE STATUS
-===================================================== */
-
-let currentAttendance = {};
-
-
-/* =====================================================
-   DISPLAY ATTENDANCE STUDENTS
-===================================================== */
-
-function displayAttendanceStudents() {
-
-    if (!attendanceTableBody) {
-
-        return;
-
-    }
-
-
-    attendanceTableBody.innerHTML = "";
-
-
-    if (students.length === 0) {
-
-        attendanceTableBody.innerHTML = `
-
+        body.innerHTML = filtered.map(s => `
             <tr>
-
-                <td
-                    colspan="4"
-                    class="empty-state"
-                >
-                    Add students first to mark attendance.
+                <td>${escapeHTML(s.roll)}</td>
+                <td>${escapeHTML(s.name)}</td>
+                <td>${escapeHTML(s.course)}</td>
+                <td>${escapeHTML(s.semester)}</td>
+                <td>
+                    <button type="button" class="primary-btn sam-edit-student"
+                        data-id="${escapeHTML(s.id)}">Edit</button>
+                    <button type="button" class="secondary-btn sam-delete-student"
+                        data-id="${escapeHTML(s.id)}">Delete</button>
                 </td>
-
             </tr>
-
-        `;
-
-        updateAttendanceSummary();
-
-        return;
-
+        `).join("");
     }
 
+    $("studentSearch")?.addEventListener("input", renderStudents);
 
-    students.forEach(
-        function (student) {
+    $("studentForm")?.addEventListener("submit", async event => {
+        event.preventDefault();
 
-            const existingStatus =
-                currentAttendance[
-                    student.id
-                ] || "";
+        if (isLoading) return;
 
+        const editId = $("editStudentId").value;
+        const payload = {
+            name: $("studentName").value.trim(),
+            roll_number: $("rollNumber").value.trim(),
+            course: $("course").value,
+            semester: $("semester").value
+        };
 
-            const row =
-                document.createElement("tr");
-
-
-            row.innerHTML = `
-
-                <td>
-
-                    <span class="roll-number">
-                        ${student.roll}
-                    </span>
-
-                </td>
-
-
-                <td>
-
-                    <span class="student-table-name">
-                        ${student.name}
-                    </span>
-
-                </td>
-
-
-                <td>
-
-                    <span class="course-badge">
-                        ${student.course}
-                    </span>
-
-                </td>
-
-
-                <td>
-
-                    <div class="attendance-buttons">
-
-                        <button
-                            type="button"
-                            class="attendance-btn present-btn
-                            ${
-                                existingStatus === "Present"
-                                ? "selected"
-                                : ""
-                            }"
-                            onclick="setAttendance(
-                                '${student.id}',
-                                'Present'
-                            )"
-                        >
-                            Present
-                        </button>
-
-
-                        <button
-                            type="button"
-                            class="attendance-btn absent-btn
-                            ${
-                                existingStatus === "Absent"
-                                ? "selected"
-                                : ""
-                            }"
-                            onclick="setAttendance(
-                                '${student.id}',
-                                'Absent'
-                            )"
-                        >
-                            Absent
-                        </button>
-
-                    </div>
-
-                </td>
-
-            `;
-
-
-            attendanceTableBody.appendChild(
-                row
-            );
-
-        }
-    );
-
-
-    updateAttendanceSummary();
-
-}
-
-
-/* =====================================================
-   SET ATTENDANCE
-===================================================== */
-
-function setAttendance(
-    studentId,
-    status
-) {
-
-    currentAttendance[
-        studentId
-    ] = status;
-
-
-    displayAttendanceStudents();
-
-}
-
-
-/* =====================================================
-   ATTENDANCE SUMMARY
-===================================================== */
-
-function updateAttendanceSummary() {
-
-    if (!presentCount || !absentCount) {
-
-        return;
-
-    }
-
-
-    let present = 0;
-
-    let absent = 0;
-
-
-    Object.values(
-        currentAttendance
-    ).forEach(function (status) {
-
-        if (status === "Present") {
-
-            present++;
-
+        if (!payload.name || !payload.roll_number ||
+            !payload.course || !payload.semester) {
+            showMessage($("studentFormMessage"), "Please complete all student fields.");
+            return;
         }
 
-        if (status === "Absent") {
+        const duplicate = students.some(s =>
+            s.roll.toLowerCase() === payload.roll_number.toLowerCase() &&
+            s.id !== String(editId)
+        );
 
-            absent++;
-
+        if (duplicate) {
+            showMessage($("studentFormMessage"), "This roll number already exists.");
+            return;
         }
 
-    });
+        isLoading = true;
 
+        try {
+            let result;
 
-    presentCount.textContent =
-        present;
-
-    absentCount.textContent =
-        absent;
-
-}
-
-
-/* =====================================================
-   SAVE ATTENDANCE
-===================================================== */
-
-if (saveAttendanceBtn) {
-
-    saveAttendanceBtn.addEventListener(
-        "click",
-        function () {
-
-            const date =
-                attendanceDate.value;
-
-            const subject =
-                attendanceSubject.value;
-
-
-            if (!date) {
-
-                showAttendanceMessage(
-                    "Please select a date.",
-                    "error"
-                );
-
-                return;
-
+            if (editId) {
+                result = await supabaseClient
+                    .from("students")
+                    .update(payload)
+                    .eq("id", Number(editId));
+            } else {
+                result = await supabaseClient
+                    .from("students")
+                    .insert(payload);
             }
 
+            if (result.error) throw result.error;
 
-            if (!subject) {
+            $("studentForm").reset();
+            $("editStudentId").value = "";
+            $("studentFormTitle").textContent = "Add New Student";
+            $("studentSubmitBtn").textContent = "Add Student";
+            $("cancelEditBtn").style.display = "none";
 
-                showAttendanceMessage(
-                    "Please select a subject.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            if (
-                Object.keys(
-                    currentAttendance
-                ).length !== students.length
-            ) {
-
-                showAttendanceMessage(
-                    "Please mark attendance for every student.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            /* Remove existing record
-               for same date and subject */
-
-            attendanceRecords =
-                attendanceRecords.filter(
-                    function (record) {
-
-                        return !(
-                            record.date === date
-                            &&
-                            record.subject === subject
-                        );
-
-                    }
-                );
-
-
-            /* Create attendance record */
-
-            students.forEach(
-                function (student) {
-
-                    attendanceRecords.push({
-
-                        id:
-                            Date.now().toString()
-                            +
-                            student.id,
-
-                        date:
-                            date,
-
-                        subject:
-                            subject,
-
-                        studentId:
-                            student.id,
-
-                        studentName:
-                            student.name,
-
-                        roll:
-                            student.roll,
-
-                        status:
-                            currentAttendance[
-                                student.id
-                            ]
-
-                    });
-
-                }
-            );
-
-
-            saveAttendanceRecords();
-
-
-            showAttendanceMessage(
-                "Attendance saved successfully.",
+            showMessage(
+                $("studentFormMessage"),
+                editId ? "Student updated successfully." : "Student added successfully.",
                 "success"
             );
 
-
-            updateDashboard();
-
-
-            displayRecentAttendance();
-
+            await loadAllData();
+        } catch (error) {
+            showMessage(
+                $("studentFormMessage"),
+                showError(error, "Could not save student")
+            );
+        } finally {
+            isLoading = false;
         }
-    );
-
-}
-
-
-/* =====================================================
-   ATTENDANCE MESSAGE
-===================================================== */
-
-function showAttendanceMessage(
-    message,
-    type
-) {
-
-    if (!attendanceMessage) {
-
-        return;
-
-    }
-
-
-    attendanceMessage.textContent =
-        message;
-
-    attendanceMessage.className =
-        "form-message " + type;
-
-
-    setTimeout(function () {
-
-        attendanceMessage.textContent =
-            "";
-
-        attendanceMessage.className =
-            "form-message";
-
-    }, 3000);
-
-}
-
-
-/* =====================================================
-   DASHBOARD
-===================================================== */
-
-function updateDashboard() {
-
-    const totalStudents =
-        document.getElementById(
-            "totalStudents"
-        );
-
-    const presentToday =
-        document.getElementById(
-            "presentToday"
-        );
-
-    const absentToday =
-        document.getElementById(
-            "absentToday"
-        );
-
-    const attendanceRate =
-        document.getElementById(
-            "attendanceRate"
-        );
-
-
-    if (!totalStudents) {
-
-        return;
-
-    }
-
-
-    const today =
-        new Date()
-            .toISOString()
-            .split("T")[0];
-
-
-    const todayRecords =
-        attendanceRecords.filter(
-            function (record) {
-
-                return record.date === today;
-
-            }
-        );
-
-
-    const present =
-        todayRecords.filter(
-            function (record) {
-
-                return record.status === "Present";
-
-            }
-        ).length;
-
-
-    const absent =
-        todayRecords.filter(
-            function (record) {
-
-                return record.status === "Absent";
-
-            }
-        ).length;
-
-
-    const total =
-        present + absent;
-
-
-    const rate =
-        total > 0
-        ? Math.round(
-            (present / total) * 100
-        )
-        : 0;
-
-
-    totalStudents.textContent =
-        students.length;
-
-    presentToday.textContent =
-        present;
-
-    absentToday.textContent =
-        absent;
-
-    attendanceRate.textContent =
-        rate + "%";
-
-
-    displayRecentAttendance();
-
-}
-
-
-/* =====================================================
-   RECENT ATTENDANCE
-===================================================== */
-
-function displayRecentAttendance() {
-
-    const recentAttendance =
-        document.getElementById(
-            "recentAttendance"
-        );
-
-
-    if (!recentAttendance) {
-
-        return;
-
-    }
-
-
-    recentAttendance.innerHTML = "";
-
-
-    const recentRecords =
-        attendanceRecords
-            .slice()
-            .reverse()
-            .slice(0, 8);
-
-
-    if (recentRecords.length === 0) {
-
-        recentAttendance.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="4"
-                    class="empty-state"
-                >
-                    No attendance records available
-                </td>
-
-            </tr>
-
-        `;
-
-        return;
-
-    }
-
-
-    recentRecords.forEach(
-        function (record) {
-
-            const row =
-                document.createElement("tr");
-
-
-            const statusClass =
-                record.status === "Present"
-                ? "status-present"
-                : "status-absent";
-
-
-            row.innerHTML = `
-
-                <td>
-                    ${record.studentName}
-                </td>
-
-                <td>
-                    ${record.subject}
-                </td>
-
-                <td>
-                    ${record.date}
-                </td>
-
-                <td>
-
-                    <span class="${statusClass}">
-                        ${record.status}
-                    </span>
-
-                </td>
-
-            `;
-
-
-            recentAttendance.appendChild(
-                row
+    });
+
+    $("cancelEditBtn")?.addEventListener("click", () => {
+        $("studentForm").reset();
+        $("editStudentId").value = "";
+        $("studentFormTitle").textContent = "Add New Student";
+        $("studentSubmitBtn").textContent = "Add Student";
+        $("cancelEditBtn").style.display = "none";
+        showMessage($("studentFormMessage"), "");
+    });
+
+    $("studentTableBody")?.addEventListener("click", async event => {
+        const editButton = event.target.closest(".sam-edit-student");
+        const deleteButton = event.target.closest(".sam-delete-student");
+
+        if (editButton) {
+            const student = students.find(
+                s => s.id === editButton.dataset.id
             );
 
+            if (!student) return;
+
+            $("editStudentId").value = student.id;
+            $("studentName").value = student.name;
+            $("rollNumber").value = student.roll;
+            $("course").value = student.course;
+            $("semester").value = student.semester;
+            $("studentFormTitle").textContent = "Edit Student";
+            $("studentSubmitBtn").textContent = "Update Student";
+            $("cancelEditBtn").style.display = "inline-block";
+
+            $("studentForm").scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
         }
-    );
 
-}
-
-
-/* =====================================================
-   INITIALIZE APPLICATION
-===================================================== */
-
-setTodayDate();
-
-displayStudents();
-
-displayAttendanceStudents();
-
-updateDashboard();
-
-
-console.log(
-    "Smart Attendance System initialized successfully."
-);
-/* =====================================================
-   SUBJECT MANAGEMENT
-===================================================== */
-
-
-/* Load subjects */
-
-let subjects =
-    JSON.parse(
-        localStorage.getItem(
-            "smartAttendanceSubjects"
-        )
-    ) || [];
-
-
-/* Subject elements */
-
-const subjectForm =
-    document.getElementById(
-        "subjectForm"
-    );
-
-const subjectName =
-    document.getElementById(
-        "subjectName"
-    );
-
-const subjectCode =
-    document.getElementById(
-        "subjectCode"
-    );
-
-const subjectTableBody =
-    document.getElementById(
-        "subjectTableBody"
-    );
-
-const subjectSearch =
-    document.getElementById(
-        "subjectSearch"
-    );
-
-const subjectMessage =
-    document.getElementById(
-        "subjectMessage"
-    );
-
-
-/* =====================================================
-   SAVE SUBJECTS
-===================================================== */
-
-function saveSubjects() {
-
-    localStorage.setItem(
-        "smartAttendanceSubjects",
-        JSON.stringify(subjects)
-    );
-
-}
-
-
-/* =====================================================
-   DISPLAY SUBJECTS
-===================================================== */
-
-function displaySubjects(
-    searchTerm = ""
-) {
-
-    if (!subjectTableBody) {
-        return;
-    }
-
-
-    subjectTableBody.innerHTML = "";
-
-
-    const search =
-        searchTerm.toLowerCase();
-
-
-    const filteredSubjects =
-        subjects.filter(
-            function (subject) {
-
-                return (
-
-                    subject.name
-                        .toLowerCase()
-                        .includes(search)
-
-                    ||
-
-                    subject.code
-                        .toLowerCase()
-                        .includes(search)
-
-                );
-
-            }
-        );
-
-
-    if (filteredSubjects.length === 0) {
-
-        subjectTableBody.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="3"
-                    class="empty-state"
-                >
-                    ${
-                        subjects.length === 0
-                        ? "No subjects added yet"
-                        : "No matching subjects found"
-                    }
-                </td>
-
-            </tr>
-
-        `;
-
-        return;
-
-    }
-
-
-    filteredSubjects.forEach(
-        function (subject) {
-
-            const row =
-                document.createElement("tr");
-
-
-            row.innerHTML = `
-
-                <td>
-
-                    <span class="subject-code">
-                        ${subject.code}
-                    </span>
-
-                </td>
-
-
-                <td>
-
-                    <span class="subject-name">
-                        ${subject.name}
-                    </span>
-
-                </td>
-
-
-                <td>
-
-                    <button
-                        class="subject-delete-btn"
-                        onclick="deleteSubject('${subject.id}')"
-                    >
-                        Delete
-                    </button>
-
-                </td>
-
-            `;
-
-
-            subjectTableBody.appendChild(
-                row
+        if (deleteButton) {
+            const student = students.find(
+                s => s.id === deleteButton.dataset.id
             );
 
+            if (!student) return;
+
+            if (!confirm(
+                `Delete ${student.name}? Their related attendance records may also be deleted.`
+            )) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from("students")
+                    .delete()
+                    .eq("id", Number(student.id));
+
+                if (error) throw error;
+
+                await loadAllData();
+                showMessage(
+                    $("studentFormMessage"),
+                    "Student deleted successfully.",
+                    "success"
+                );
+            } catch (error) {
+                alert(showError(error, "Could not delete student"));
+            }
         }
-    );
+    });
 
-}
+    /* =====================================================
+       SUBJECTS
+       ===================================================== */
 
+    function renderSubjects() {
+        const body = $("subjectTableBody");
+        if (!body) return;
 
-/* =====================================================
-   ADD SUBJECT
-===================================================== */
+        const search = ($("subjectSearch")?.value || "").toLowerCase();
 
-if (subjectForm) {
+        const filtered = subjects.filter(s =>
+            [s.name, s.code].some(value =>
+                String(value).toLowerCase().includes(search)
+            )
+        );
 
-    subjectForm.addEventListener(
-        "submit",
-        function (event) {
+        if (!filtered.length) {
+            body.innerHTML = `
+                <tr><td colspan="3" class="empty-state">
+                    ${subjects.length ? "No matching subjects found." : "No subjects added yet."}
+                </td></tr>`;
+            return;
+        }
 
-            event.preventDefault();
+        body.innerHTML = filtered.map(s => `
+            <tr>
+                <td>${escapeHTML(s.code)}</td>
+                <td>${escapeHTML(s.name)}</td>
+                <td>
+                    <button type="button" class="secondary-btn sam-delete-subject"
+                        data-id="${escapeHTML(s.id)}">Delete</button>
+                </td>
+            </tr>
+        `).join("");
+    }
 
+    $("subjectSearch")?.addEventListener("input", renderSubjects);
 
-            const name =
-                subjectName.value.trim();
+    $("subjectForm")?.addEventListener("submit", async event => {
+        event.preventDefault();
 
-            const code =
-                subjectCode.value.trim();
+        const name = $("subjectName").value.trim();
+        const code = $("subjectCode").value.trim();
 
+        if (!name || !code) {
+            showMessage($("subjectMessage"), "Please enter the subject name and code.");
+            return;
+        }
 
-            if (!name || !code) {
-
-                showSubjectMessage(
-                    "Please fill in all fields.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            /* Check duplicate code */
-
-            const duplicate =
-                subjects.find(
-                    function (subject) {
-
-                        return (
-                            subject.code
-                                .toLowerCase() ===
-                            code.toLowerCase()
-                        );
-
-                    }
-                );
-
-
-            if (duplicate) {
-
-                showSubjectMessage(
-                    "This subject code already exists.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            const newSubject = {
-
-                id:
-                    Date.now().toString(),
-
-                name:
+        try {
+            const { error } = await supabaseClient
+                .from("subjects")
+                .insert({
                     name,
+                    subject_code: code
+                });
 
-                code:
-                    code.toUpperCase()
+            if (error) throw error;
 
-            };
+            $("subjectForm").reset();
 
-
-            subjects.push(
-                newSubject
-            );
-
-
-            saveSubjects();
-
-            displaySubjects();
-
-            updateSubjectDropdown();
-
-updateReportFilters();
-
-
-            subjectForm.reset();
-
-
-            showSubjectMessage(
+            showMessage(
+                $("subjectMessage"),
                 "Subject added successfully.",
                 "success"
             );
 
-        }
-    );
-
-}
-
-
-/* =====================================================
-   DELETE SUBJECT
-===================================================== */
-
-function deleteSubject(id) {
-
-    const subject =
-        subjects.find(
-            function (item) {
-
-                return item.id === id;
-
-            }
-        );
-
-
-    if (!subject) {
-        return;
-    }
-
-
-    const confirmed =
-        confirm(
-            `Delete ${subject.name}?`
-        );
-
-
-    if (!confirmed) {
-        return;
-    }
-
-
-    subjects =
-        subjects.filter(
-            function (item) {
-
-                return item.id !== id;
-
-            }
-        );
-
-
-    saveSubjects();
-
-    displaySubjects();
-
-    updateSubjectDropdown();
-
-
-    showSubjectMessage(
-        "Subject deleted successfully.",
-        "success"
-    );
-
-}
-
-
-/* =====================================================
-   SUBJECT SEARCH
-===================================================== */
-
-if (subjectSearch) {
-
-    subjectSearch.addEventListener(
-        "input",
-        function () {
-
-            displaySubjects(
-                this.value
+            await loadAllData();
+        } catch (error) {
+            showMessage(
+                $("subjectMessage"),
+                showError(error, "Could not add subject")
             );
-
         }
-    );
-
-}
-
-
-/* =====================================================
-   SUBJECT MESSAGE
-===================================================== */
-
-function showSubjectMessage(
-    message,
-    type
-) {
-
-    if (!subjectMessage) {
-        return;
-    }
-
-
-    subjectMessage.textContent =
-        message;
-
-    subjectMessage.className =
-        "form-message " + type;
-
-
-    setTimeout(
-        function () {
-
-            subjectMessage.textContent =
-                "";
-
-            subjectMessage.className =
-                "form-message";
-
-        },
-        3000
-    );
-
-}
-
-
-/* =====================================================
-   UPDATE ATTENDANCE SUBJECT DROPDOWN
-===================================================== */
-
-function updateSubjectDropdown() {
-
-    if (!attendanceSubject) {
-        return;
-    }
-
-
-    attendanceSubject.innerHTML = `
-
-        <option value="">
-            Select subject
-        </option>
-
-    `;
-
-
-    subjects.forEach(
-        function (subject) {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                subject.name;
-
-            option.textContent =
-                `${subject.code} — ${subject.name}`;
-
-
-            attendanceSubject.appendChild(
-                option
-            );
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   INITIALIZE SUBJECTS
-===================================================== */
-
-displaySubjects();
-
-updateSubjectDropdown();
-/* =====================================================
-   REPORTS
-===================================================== */
-
-const reportStudent =
-    document.getElementById("reportStudent");
-
-const reportSubject =
-    document.getElementById("reportSubject");
-
-const generateReportBtn =
-    document.getElementById("generateReportBtn");
-
-const reportTableBody =
-    document.getElementById("reportTableBody");
-
-const reportTotalClasses =
-    document.getElementById("reportTotalClasses");
-
-const reportPresent =
-    document.getElementById("reportPresent");
-
-const reportAbsent =
-    document.getElementById("reportAbsent");
-
-const reportPercentage =
-    document.getElementById("reportPercentage");
-
-
-/* Populate report filters */
-
-function updateReportFilters() {
-
-    if (!reportStudent || !reportSubject) {
-        return;
-    }
-
-
-    reportStudent.innerHTML = `
-        <option value="all">
-            All Students
-        </option>
-    `;
-
-
-    students.forEach(function(student) {
-
-        const option =
-            document.createElement("option");
-
-        option.value = student.id;
-
-        option.textContent =
-            `${student.roll} — ${student.name}`;
-
-        reportStudent.appendChild(option);
-
     });
 
+    $("subjectTableBody")?.addEventListener("click", async event => {
+        const button = event.target.closest(".sam-delete-subject");
+        if (!button) return;
 
-    reportSubject.innerHTML = `
-        <option value="all">
-            All Subjects
-        </option>
-    `;
+        const subject = subjects.find(s => s.id === button.dataset.id);
+        if (!subject) return;
 
+        if (!confirm(
+            `Delete ${subject.name}? Related attendance records may also be deleted.`
+        )) return;
 
-    subjects.forEach(function(subject) {
+        try {
+            const { error } = await supabaseClient
+                .from("subjects")
+                .delete()
+                .eq("id", Number(subject.id));
 
-        const option =
-            document.createElement("option");
+            if (error) throw error;
 
-        option.value = subject.name;
+            await loadAllData();
 
-        option.textContent =
-            `${subject.code} — ${subject.name}`;
-
-        reportSubject.appendChild(option);
-
+            showMessage(
+                $("subjectMessage"),
+                "Subject deleted successfully.",
+                "success"
+            );
+        } catch (error) {
+            alert(showError(error, "Could not delete subject"));
+        }
     });
 
-}
+    function fillSubjectDropdowns() {
+        const attendanceSelect = $("attendanceSubject");
+        const reportSelect = $("reportSubject");
 
+        if (attendanceSelect) {
+            const selected = attendanceSelect.value;
 
-/* Generate report */
+            attendanceSelect.innerHTML =
+                `<option value="">Select subject</option>` +
+                subjects.map(s => `
+                    <option value="${escapeHTML(s.id)}">
+                        ${escapeHTML(s.name)} (${escapeHTML(s.code)})
+                    </option>
+                `).join("");
 
-function generateReport() {
+            if (subjects.some(s => s.id === selected)) {
+                attendanceSelect.value = selected;
+            }
+        }
 
-    if (!reportTableBody) {
-        return;
+        if (reportSelect) {
+            const selected = reportSelect.value || "all";
+
+            reportSelect.innerHTML =
+                `<option value="all">All Subjects</option>` +
+                subjects.map(s => `
+                    <option value="${escapeHTML(s.id)}">
+                        ${escapeHTML(s.name)}
+                    </option>
+                `).join("");
+
+            reportSelect.value = subjects.some(s => s.id === selected)
+                ? selected : "all";
+        }
     }
 
+    /* =====================================================
+       ATTENDANCE
+       ===================================================== */
 
-    const selectedStudent =
-        reportStudent.value;
+    function fillReportStudentDropdown() {
+        const select = $("reportStudent");
+        if (!select) return;
 
-    const selectedSubject =
-        reportSubject.value;
+        const selected = select.value || "all";
 
+        select.innerHTML =
+            `<option value="all">All Students</option>` +
+            students.map(s => `
+                <option value="${escapeHTML(s.id)}">
+                    ${escapeHTML(s.roll)} - ${escapeHTML(s.name)}
+                </option>
+            `).join("");
 
-    let records =
-        attendanceRecords.slice();
+        select.value = students.some(s => s.id === selected)
+            ? selected : "all";
+    }
 
+    async function loadAttendanceForSelection() {
+        const date = $("attendanceDate")?.value || today();
+        const subjectId = $("attendanceSubject")?.value || "";
 
-    if (selectedStudent !== "all") {
+        currentAttendance = {};
 
-        records =
-            records.filter(function(record) {
+        if (!subjectId) {
+            renderAttendance();
+            return;
+        }
 
-                return record.studentId ===
-                    selectedStudent;
-
+        attendanceRecords
+            .filter(r => r.date === date && r.subjectId === subjectId)
+            .forEach(r => {
+                currentAttendance[r.studentId] = r.status;
             });
 
+        renderAttendance();
     }
 
+    function renderAttendance() {
+        const body = $("attendanceTableBody");
+        if (!body) return;
 
-    if (selectedSubject !== "all") {
+        const date = $("attendanceDate")?.value || today();
+        const subjectId = $("attendanceSubject")?.value || "";
 
-        records =
-            records.filter(function(record) {
+        if (!students.length) {
+            body.innerHTML = `
+                <tr><td colspan="4" class="empty-state">
+                    Add students first to mark attendance.
+                </td></tr>`;
+            updateAttendanceCounts();
+            return;
+        }
 
-                return record.subject ===
-                    selectedSubject;
+        if (!subjectId) {
+            body.innerHTML = `
+                <tr><td colspan="4" class="empty-state">
+                    Please select a subject first.
+                </td></tr>`;
+            updateAttendanceCounts();
+            return;
+        }
 
-            });
+        body.innerHTML = students.map(s => {
+            const status = currentAttendance[s.id] || "";
 
-    }
-
-
-    reportTableBody.innerHTML = "";
-
-
-    if (records.length === 0) {
-
-        reportTableBody.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="5"
-                    class="empty-state"
-                >
-                    No attendance records found
-                </td>
-
-            </tr>
-
-        `;
-
-    }
-    else {
-
-        records
-            .slice()
-            .reverse()
-            .forEach(function(record) {
-
-                const row =
-                    document.createElement("tr");
-
-
-                const statusClass =
-                    record.status === "Present"
-                    ? "status-present"
-                    : "status-absent";
-
-
-                row.innerHTML = `
-
+            return `
+                <tr>
+                    <td>${escapeHTML(s.roll)}</td>
+                    <td>${escapeHTML(s.name)}</td>
+                    <td>${escapeHTML(s.course)}</td>
                     <td>
-                        ${record.roll}
-                    </td>
+                        <button type="button"
+                            class="primary-btn sam-mark-present"
+                            data-id="${escapeHTML(s.id)}"
+                            aria-pressed="${status === "Present"}"
+                            style="${status === "Present" ? "outline:3px solid #16a34a;" : ""}">
+                            Present
+                        </button>
 
-                    <td>
-                        ${record.studentName}
-                    </td>
+                        <button type="button"
+                            class="secondary-btn sam-mark-absent"
+                            data-id="${escapeHTML(s.id)}"
+                            aria-pressed="${status === "Absent"}"
+                            style="${status === "Absent" ? "outline:3px solid #dc2626;" : ""}">
+                            Absent
+                        </button>
 
-                    <td>
-                        ${record.subject}
-                    </td>
-
-                    <td>
-                        ${record.date}
-                    </td>
-
-                    <td>
-                        <span class="${statusClass}">
-                            ${record.status}
+                        <span style="margin-left:6px;font-size:12px;">
+                            ${escapeHTML(status)}
                         </span>
                     </td>
+                </tr>
+            `;
+        }).join("");
 
-                `;
-
-
-                reportTableBody.appendChild(row);
-
-            });
-
+        updateAttendanceCounts();
     }
 
+    function updateAttendanceCounts() {
+        const values = Object.values(currentAttendance);
 
-    const total =
-        records.length;
+        if ($("presentCount")) {
+            $("presentCount").textContent =
+                values.filter(s => s === "Present").length;
+        }
 
+        if ($("absentCount")) {
+            $("absentCount").textContent =
+                values.filter(s => s === "Absent").length;
+        }
+    }
 
-    const present =
-        records.filter(function(record) {
+    $("attendanceDate")?.addEventListener("change", loadAttendanceForSelection);
+    $("attendanceSubject")?.addEventListener("change", loadAttendanceForSelection);
 
-            return record.status === "Present";
+    $("attendanceTableBody")?.addEventListener("click", event => {
+        const present = event.target.closest(".sam-mark-present");
+        const absent = event.target.closest(".sam-mark-absent");
 
-        }).length;
+        if (!present && !absent) return;
 
+        const button = present || absent;
+        const studentId = button.dataset.id;
 
-    const absent =
-        records.filter(function(record) {
+        currentAttendance[studentId] = present ? "Present" : "Absent";
 
-            return record.status === "Absent";
+        renderAttendance();
+        showMessage($("attendanceMessage"), "");
+    });
 
-        }).length;
+    $("saveAttendanceBtn")?.addEventListener("click", async () => {
+        const date = $("attendanceDate")?.value || today();
+        const subjectId = $("attendanceSubject")?.value || "";
 
+        if (!students.length) {
+            showMessage($("attendanceMessage"), "Add students before saving attendance.");
+            return;
+        }
 
-    const percentage =
-        total > 0
-        ? Math.round((present / total) * 100)
-        : 0;
+        if (!subjectId) {
+            showMessage($("attendanceMessage"), "Please select a subject.");
+            return;
+        }
 
+        const missing = students.filter(s => !currentAttendance[s.id]);
 
-    reportTotalClasses.textContent =
-        total;
+        if (missing.length) {
+            showMessage(
+                $("attendanceMessage"),
+                `Please mark attendance for every student. ${missing.length} student(s) remain unmarked.`
+            );
+            return;
+        }
 
-    reportPresent.textContent =
-        present;
+        const rows = students.map(s => ({
+            student_id: Number(s.id),
+            subject_id: Number(subjectId),
+            attendance_date: date,
+            status: currentAttendance[s.id]
+        }));
 
-    reportAbsent.textContent =
-        absent;
+        const button = $("saveAttendanceBtn");
+        button.disabled = true;
+        button.textContent = "Saving...";
 
-    reportPercentage.textContent =
-        percentage + "%";
+        try {
+            const { error } = await supabaseClient
+                .from("attendance")
+                .upsert(rows, {
+                    onConflict: "student_id,subject_id,attendance_date"
+                });
 
-}
+            if (error) throw error;
 
+            showMessage(
+                $("attendanceMessage"),
+                "Attendance saved successfully!",
+                "success"
+            );
 
-/* Generate report button */
+            await loadAllData();
+            await loadAttendanceForSelection();
+        } catch (error) {
+            showMessage(
+                $("attendanceMessage"),
+                showError(error, "Could not save attendance")
+            );
+        } finally {
+            button.disabled = false;
+            button.textContent = "Save Attendance";
+        }
+    });
 
-if (generateReportBtn) {
+    /* =====================================================
+       DASHBOARD
+       ===================================================== */
 
-    generateReportBtn.addEventListener(
-        "click",
-        generateReport
-    );
+    function renderDashboard() {
+        const todayRecords = attendanceRecords.filter(r => r.date === today());
+        const present = todayRecords.filter(r => r.status === "Present").length;
+        const absent = todayRecords.filter(r => r.status === "Absent").length;
+        const total = todayRecords.length;
+        const rate = total ? Math.round((present / total) * 100) : 0;
 
-}
+        if ($("totalStudents")) $("totalStudents").textContent = students.length;
+        if ($("presentToday")) $("presentToday").textContent = present;
+        if ($("absentToday")) $("absentToday").textContent = absent;
+        if ($("attendanceRate")) $("attendanceRate").textContent = `${rate}%`;
 
+        const body = $("recentAttendance");
+        if (!body) return;
 
-/* Initialize reports */
+        const recent = [...attendanceRecords]
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 10);
 
-updateReportFilters();
+        if (!recent.length) {
+            body.innerHTML = `
+                <tr><td colspan="4" class="empty-state">
+                    No attendance records available
+                </td></tr>`;
+            return;
+        }
 
-generateReport();
+        body.innerHTML = recent.map(r => `
+            <tr>
+                <td>${escapeHTML(r.studentName)}</td>
+                <td>${escapeHTML(r.subject)}</td>
+                <td>${formatDate(r.date)}</td>
+                <td>${escapeHTML(r.status)}</td>
+            </tr>
+        `).join("");
+    }
+
+    /* =====================================================
+       REPORTS
+       ===================================================== */
+
+    function generateReport() {
+        const body = $("reportTableBody");
+        if (!body) return;
+
+        const studentId = $("reportStudent")?.value || "all";
+        const subjectId = $("reportSubject")?.value || "all";
+
+        const filtered = attendanceRecords.filter(r =>
+            (studentId === "all" || r.studentId === studentId) &&
+            (subjectId === "all" || r.subjectId === subjectId)
+        );
+
+        const present = filtered.filter(r => r.status === "Present").length;
+        const absent = filtered.filter(r => r.status === "Absent").length;
+        const rate = filtered.length
+            ? Math.round((present / filtered.length) * 100)
+            : 0;
+
+        if ($("reportTotalClasses")) {
+            $("reportTotalClasses").textContent = filtered.length;
+        }
+
+        if ($("reportPresent")) $("reportPresent").textContent = present;
+        if ($("reportAbsent")) $("reportAbsent").textContent = absent;
+
+        if ($("reportPercentage")) {
+            $("reportPercentage").textContent = `${rate}%`;
+        }
+
+        if (!filtered.length) {
+            body.innerHTML = `
+                <tr><td colspan="5" class="empty-state">
+                    No attendance records available
+                </td></tr>`;
+            return;
+        }
+
+        body.innerHTML = filtered
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .map(r => `
+                <tr>
+                    <td>${escapeHTML(r.roll)}</td>
+                    <td>${escapeHTML(r.studentName)}</td>
+                    <td>${escapeHTML(r.subject)}</td>
+                    <td>${formatDate(r.date)}</td>
+                    <td>${escapeHTML(r.status)}</td>
+                </tr>
+            `).join("");
+    }
+
+    $("generateReportBtn")?.addEventListener("click", generateReport);
+    $("reportStudent")?.addEventListener("change", generateReport);
+    $("reportSubject")?.addEventListener("change", generateReport);
+
+    /* =====================================================
+       AUTHENTICATION INITIALIZATION
+       ===================================================== */
+
+    async function initializeApp() {
+        document.querySelector(".app").style.visibility = "hidden";
+
+        if ($("attendanceDate") && !$("attendanceDate").value) {
+            $("attendanceDate").value = today();
+        }
+
+        try {
+            const { data, error } = await supabaseClient.auth.getSession();
+            if (error) throw error;
+
+            if (data.session?.user) {
+                currentUser = data.session.user;
+                await loadAllData();
+
+                authUI.overlay.style.display = "none";
+                authUI.loading.style.display = "none";
+                document.querySelector(".app").style.visibility = "visible";
+            } else {
+                authUI.loading.style.display = "none";
+                authUI.overlay.style.display = "flex";
+            }
+        } catch (error) {
+            authUI.loading.style.display = "none";
+            authUI.overlay.style.display = "flex";
+
+            showMessage(
+                $("sam-auth-message"),
+                showError(error, "Could not connect to Supabase")
+            );
+        }
+    }
+
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_OUT") {
+            currentUser = null;
+            authUI.overlay.style.display = "flex";
+            authUI.loading.style.display = "none";
+            document.querySelector(".app").style.visibility = "hidden";
+        }
+    });
+
+    initializeApp();
+})();
